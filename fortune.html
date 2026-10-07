@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>오늘의 운세</title>
+<style>
+  :root {
+    --bg1: #0b0620;
+    --bg2: #1a0f3d;
+    --gold: #e8c874;
+    --violet: #9b7bff;
+    --text: #e9e3ff;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    background: radial-gradient(ellipse at 50% 20%, var(--bg2), var(--bg1) 70%);
+    color: var(--text);
+    font-family: "Noto Serif KR", "Batang", Georgia, serif;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 28px; padding: 24px 16px; overflow-x: hidden; text-align: center;
+  }
+  .stars { position: fixed; inset: 0; pointer-events: none; z-index: 0; }
+  .star {
+    position: absolute; width: 2px; height: 2px; border-radius: 50%;
+    background: #fff; opacity: .2; animation: twinkle 3s infinite ease-in-out;
+  }
+  @keyframes twinkle { 50% { opacity: 1; transform: scale(1.8); } }
+
+  main { position: relative; z-index: 1; display: flex; flex-direction: column; align-items: center; gap: 28px; width: 100%; }
+  h1 {
+    margin: 0; font-weight: 400; letter-spacing: .3em; font-size: clamp(1.4rem, 5vw, 2rem);
+    color: var(--gold); text-shadow: 0 0 18px rgba(232,200,116,.5);
+  }
+  .sub { margin: -16px 0 0; opacity: .6; font-size: .9rem; letter-spacing: .1em; }
+
+  .scene { width: 200px; height: 300px; perspective: 1000px; }
+  .card {
+    position: relative; width: 100%; height: 100%;
+    transition: transform .9s cubic-bezier(.3,1.2,.4,1); transform-style: preserve-3d;
+  }
+  .card.flipped { transform: rotateY(180deg); }
+  .card.shuffling { animation: shake .6s; }
+  @keyframes shake {
+    20% { transform: translateX(-8px) rotate(-3deg); }
+    40% { transform: translateX(8px) rotate(3deg); }
+    60% { transform: translateX(-6px) rotate(-2deg); }
+    80% { transform: translateX(6px) rotate(2deg); }
+  }
+  .face {
+    position: absolute; inset: 0; border-radius: 16px; backface-visibility: hidden;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px;
+    border: 2px solid var(--gold);
+    box-shadow: 0 0 30px rgba(155,123,255,.45), inset 0 0 30px rgba(232,200,116,.12);
+  }
+  .back {
+    background:
+      radial-gradient(circle at 50% 50%, rgba(155,123,255,.35), transparent 60%),
+      repeating-linear-gradient(45deg, #1d1246 0 10px, #251656 10px 20px);
+    font-size: 4rem; color: var(--gold); text-shadow: 0 0 20px var(--gold);
+  }
+  .front {
+    transform: rotateY(180deg);
+    background: linear-gradient(160deg, #2a1a5e, #120a30);
+  }
+  .front .symbol { font-size: 4.5rem; filter: drop-shadow(0 0 14px var(--violet)); }
+  .front .name { color: var(--gold); font-size: 1.25rem; letter-spacing: .15em; }
+
+  .message {
+    max-width: 420px; min-height: 5.5em; line-height: 1.8; font-size: 1.05rem;
+    opacity: 0; transform: translateY(10px); transition: opacity .8s, transform .8s;
+  }
+  .message.show { opacity: 1; transform: none; }
+
+  button {
+    font-family: inherit; font-size: 1.05rem; letter-spacing: .15em; cursor: pointer;
+    color: var(--gold); background: rgba(155,123,255,.12);
+    border: 1px solid var(--gold); border-radius: 999px; padding: 14px 36px;
+    box-shadow: 0 0 20px rgba(155,123,255,.35); transition: all .25s;
+  }
+  button:hover:not(:disabled) { background: rgba(232,200,116,.18); box-shadow: 0 0 30px rgba(232,200,116,.5); transform: translateY(-2px); }
+  button:disabled { opacity: .5; cursor: default; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .star, .card.shuffling { animation: none; }
+    .card, .message { transition-duration: .01s; }
+  }
+</style>
+</head>
+<body>
+<div class="stars" id="stars" aria-hidden="true"></div>
+<main>
+  <h1>✦ 오늘의 운세 ✦</h1>
+  <p class="sub">마음을 가다듬고 카드를 뽑아보세요</p>
+
+  <div class="scene">
+    <div class="card" id="card">
+      <div class="face back">✦</div>
+      <div class="face front">
+        <div class="symbol" id="symbol"></div>
+        <div class="name" id="name"></div>
+      </div>
+    </div>
+  </div>
+
+  <p class="message" id="message" aria-live="polite"></p>
+  <button id="draw">오늘의 카드 뽑기</button>
+</main>
+
+<script>
+  const CARDS = [
+    { symbol: "⭐", name: "별", msg: "희망의 빛이 당신을 비춥니다. 오래 품어온 소망이 조금씩 현실에 가까워지는 날이에요. 스스로를 믿고 한 걸음 내디뎌 보세요." },
+    { symbol: "🌙", name: "달", msg: "직감이 평소보다 예민해지는 날입니다. 겉으로 보이는 것이 전부는 아니니, 결정은 서두르지 말고 마음의 소리에 귀 기울이세요." },
+    { symbol: "☀️", name: "태양", msg: "활력과 기쁨이 넘치는 하루예요. 하는 일마다 환하게 풀리고, 주변 사람들에게도 좋은 기운을 나눠주게 될 거예요." },
+    { symbol: "👸", name: "여신", msg: "풍요와 사랑이 가까이 있습니다. 나 자신을 돌보는 시간이 큰 행운을 불러오니, 오늘은 스스로에게 너그러워지세요." },
+    { symbol: "🏮", name: "은둔자", msg: "잠시 멈춰 고요히 생각할 시간이 필요해요. 혼자만의 시간 속에서 오랫동안 찾던 답이 조용히 떠오를 거예요." },
+    { symbol: "☸️", name: "운명의 수레바퀴", msg: "흐름이 바뀌는 전환점에 서 있습니다. 뜻밖의 기회나 소식이 찾아오니, 변화를 두려워하지 말고 올라타 보세요." },
+    { symbol: "⚡", name: "탑", msg: "예상치 못한 변화가 있을 수 있지만, 무너지는 것은 낡은 것뿐이에요. 이 뒤에 더 단단한 새 출발이 기다리고 있습니다." },
+    { symbol: "🌍", name: "세계", msg: "한 사이클이 아름답게 완성되는 날입니다. 그동안의 노력이 결실을 맺으니, 성취감을 마음껏 누리세요." }
+  ];
+
+  // 반짝이는 별 배경
+  const starsEl = document.getElementById("stars");
+  for (let i = 0; i < 80; i++) {
+    const s = document.createElement("span");
+    s.className = "star";
+    s.style.left = Math.random() * 100 + "%";
+    s.style.top = Math.random() * 100 + "%";
+    s.style.animationDelay = Math.random() * 3 + "s";
+    s.style.animationDuration = 2 + Math.random() * 3 + "s";
+    starsEl.appendChild(s);
+  }
+
+  const card = document.getElementById("card");
+  const btn = document.getElementById("draw");
+  const msg = document.getElementById("message");
+  const symbolEl = document.getElementById("symbol");
+  const nameEl = document.getElementById("name");
+  let last = -1;
+
+  btn.addEventListener("click", () => {
+    btn.disabled = true;
+    msg.classList.remove("show");
+    card.classList.remove("flipped");
+    card.classList.add("shuffling");
+
+    // 직전과 다른 카드 선택
+    let idx;
+    do { idx = Math.floor(Math.random() * CARDS.length); } while (idx === last && CARDS.length > 1);
+    last = idx;
+
+    setTimeout(() => {
+      card.classList.remove("shuffling");
+      const c = CARDS[idx];
+      symbolEl.textContent = c.symbol;
+      nameEl.textContent = c.name;
+      msg.textContent = c.msg;
+      card.classList.add("flipped");
+      setTimeout(() => {
+        msg.classList.add("show");
+        btn.textContent = "다시 뽑기";
+        btn.disabled = false;
+      }, 700);
+    }, 650);
+  });
+</script>
+</body>
+</html>
